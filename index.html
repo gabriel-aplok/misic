@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Misic - Mini-DAW</title>
+        <style>
+            /* --- Root --- */
+            :root {
+                --bg: #000000;
+                --text: #ffffff;
+                --misic: #00ff00;
+                --surface: #111111;
+                --border: #333333;
+                --border-hover: #555555;
+                --font: "Courier New", Courier, monospace;
+            }
+
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+
+            body {
+                background-color: var(--bg);
+                color: var(--text);
+                font-family: var(--font);
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            /* --- Typpography and Controls --- */
+            h1,
+            h2,
+            h3,
+            label {
+                font-weight: normal;
+                font-size: 14px;
+            }
+
+            button,
+            input,
+            select {
+                background: var(--bg);
+                color: var(--text);
+                border: 1px solid var(--border);
+                font-family: var(--font);
+                font-size: 12px;
+                padding: 6px 10px;
+                cursor: pointer;
+                outline: none;
+                transition:
+                    border-color 0.1s,
+                    color 0.1s;
+                border-radius: 0;
+            }
+
+            button:hover,
+            input:hover,
+            select:hover {
+                border-color: var(--misic);
+                color: var(--misic);
+            }
+
+            button:active {
+                background: var(--misic);
+                color: var(--bg);
+            }
+
+            input[type="range"] {
+                -webkit-appearance: none;
+                width: 100%;
+                height: 4px;
+                background: var(--border);
+                padding: 0;
+            }
+            input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 12px;
+                height: 12px;
+                background: var(--text);
+                cursor: pointer;
+            }
+
+            /* --- Layout --- */
+            header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 20px;
+                border-bottom: 1px solid var(--border);
+                background: var(--surface);
+            }
+
+            .toolbar-group {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+
+            main {
+                display: flex;
+                flex: 1;
+                overflow: hidden;
+            }
+
+            /* --- Track Headers --- */
+            #track-headers {
+                width: 280px;
+                background: var(--surface);
+                border-right: 1px solid var(--border);
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .track-header {
+                height: 40px;
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                padding: 0 10px;
+                gap: 8px;
+            }
+
+            .track-header input[type="text"] {
+                width: 50px;
+                padding: 2px 4px;
+                border: 1px solid transparent;
+                background: transparent;
+            }
+            .track-header input[type="text"]:focus {
+                border-color: var(--misic);
+            }
+
+            .track-header select {
+                padding: 2px 4px;
+                width: 60px;
+            }
+
+            .track-btn {
+                padding: 2px 6px;
+                font-size: 10px;
+            }
+            .track-btn.active {
+                background: var(--misic);
+                color: var(--bg);
+                border-color: var(--misic);
+            }
+
+            /* --- Sequencer Grid --- */
+            #sequencer {
+                flex: 1;
+                overflow: auto;
+                position: relative;
+                background: var(--bg);
+            }
+
+            .grid-row {
+                display: flex;
+                height: 40px;
+                border-bottom: 1px solid var(--border);
+                width: max-content;
+            }
+            .grid-row:nth-child(even) {
+                background: #080808;
+            }
+
+            .step {
+                width: 40px;
+                height: 100%;
+                border-right: 1px solid var(--border);
+                cursor: crosshair;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                position: relative;
+            }
+
+            .step:nth-child(4n) {
+                border-right: 1px solid #555;
+            }
+
+            .step.active::after {
+                content: "";
+                width: 80%;
+                height: 80%;
+                background: var(--text);
+                box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            }
+
+            .step.active.playing::after {
+                background: var(--misic);
+                box-shadow: 0 0 15px var(--misic);
+            }
+
+            .step.playing {
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            /* --- Utilities --- */
+            .hidden {
+                display: none;
+            }
+            .logo {
+                color: var(--misic);
+                font-weight: bold;
+                font-size: 16px;
+                letter-spacing: 2px;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="toolbar-group">
+                <div class="logo">MISIC</div>
+                <button id="btn-play">PLAY</button>
+                <button id="btn-stop">STOP</button>
+                <label
+                    >BPM
+                    <input
+                        type="number"
+                        id="inp-bpm"
+                        value="120"
+                        min="40"
+                        max="300"
+                        style="width: 70px"
+                /></label>
+                <label
+                    >STEPS
+                    <select id="sel-steps">
+                        <option value="8">8</option>
+                        <option value="16" selected>16</option>
+                        <option value="32">32</option>
+                        <option value="64">64</option>
+                    </select></label
+                >
+            </div>
+            <div class="toolbar-group">
+                <button id="btn-add-track">+ TRACK</button>
+                <button id="btn-clear">CLEAR</button>
+                <button id="btn-export-json">EXP. PROJ</button>
+                <input
+                    type="file"
+                    id="inp-import-json"
+                    class="hidden"
+                    accept=".json"
+                />
+                <button id="btn-import-json">IMP. PROJ</button>
+                <button
+                    id="btn-export-wav"
+                    style="border-color: var(--misic); color: var(--misic)"
+                >
+                    EXP. WAV
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <div id="track-headers"></div>
+            <div id="sequencer">
+                <div id="grid-container"></div>
+            </div>
+        </main>
+
+        <script type="module">
+            /**
+             * MODULE: State Management
+             */
+            const AppState = {
+                version: 1,
+                bpm: 120,
+                steps: 16,
+                tracks: [],
+
+                init() {
+                    const saved = localStorage.getItem("misic_autosave");
+                    if (saved) {
+                        try {
+                            this.loadData(JSON.parse(saved));
+                            return;
+                        } catch (e) {
+                            console.error("Corrupted save", e);
+                        }
+                    }
+                    this.loadDefault();
+                },
+
+                loadDefault() {
+                    this.tracks = [];
+                    for (let i = 100; i <= 1000; i += 100) {
+                        this.addTrack(i, "sine");
+                    }
+                },
+
+                addTrack(freq = 440, type = "sine") {
+                    this.tracks.push({
+                        id: "trk_" + Math.random().toString(36).substr(2, 9),
+                        name: freq + "Hz",
+                        freq: freq,
+                        type: type,
+                        mute: false,
+                        vol: 0.8,
+                        sequence: new Array(64).fill(false), // max buffer
+                    });
+                },
+
+                loadData(data) {
+                    if (data.version) {
+                        this.bpm = data.bpm || 120;
+                        this.steps = data.steps || 16;
+                        this.tracks = data.tracks || [];
+                    }
+                },
+
+                saveData() {
+                    const data = {
+                        version: this.version,
+                        bpm: this.bpm,
+                        steps: this.steps,
+                        tracks: this.tracks,
+                    };
+                    localStorage.setItem(
+                        "misic_autosave",
+                        JSON.stringify(data),
+                    );
+                    return data;
+                },
+            };
+
+            /**
+             * MODULE: Audio Engine
+             */
+            class AudioEngine {
+                constructor() {
+                    this.ctx = new (
+                        window.AudioContext || window.webkitAudioContext
+                    )();
+                }
+
+                resume() {
+                    if (this.ctx.state === "suspended") this.ctx.resume();
+                }
+
+                playNote(track, time, duration, context = this.ctx) {
+                    if (track.mute) return;
+
+                    const osc = context.createOscillator();
+                    const gain = context.createGain();
+
+                    osc.type = track.type;
+                    osc.frequency.value = track.freq;
+
+                    osc.connect(gain);
+                    gain.connect(context.destination);
+
+                    // ADSR (attack, decay, sustain, release) to prevent clicking
+                    const attack = 0.01;
+                    const release = 0.05;
+                    const vol = track.vol;
+
+                    gain.gain.setValueAtTime(0, time);
+                    gain.gain.linearRampToValueAtTime(vol, time + attack);
+                    gain.gain.setValueAtTime(
+                        vol,
+                        Math.max(time + duration - release, time + attack),
+                    );
+                    gain.gain.linearRampToValueAtTime(0, time + duration);
+
+                    osc.start(time);
+                    osc.stop(time + duration);
+                }
+            }
+
+            /**
+             * MODULE: WAV Exporter
+             * TODO: loops on "rendering..." and never finishes export
+             */
+            class WAVExporter {
+                static async export(state) {
+                    const secondsPerBeat = 60.0 / state.bpm;
+                    const stepDuration = secondsPerBeat * 0.25; // 16th notes
+                    const totalDuration = state.steps * stepDuration;
+                    const sampleRate = 44100;
+
+                    const offlineCtx = new OfflineAudioContext(
+                        2,
+                        sampleRate * totalDuration,
+                        sampleRate,
+                    );
+                    const engine = new AudioEngine();
+
+                    // schedule all notes in the offline context
+                    for (let i = 0; i < state.steps; i++) {
+                        let time = i * stepDuration;
+                        state.tracks.forEach((track) => {
+                            if (track.sequence[i]) {
+                                engine.playNote(
+                                    track,
+                                    time,
+                                    stepDuration * 0.8,
+                                    offlineCtx,
+                                );
+                            }
+                        });
+                    }
+
+                    const renderedBuffer = await offlineCtx.startRendering();
+                    const wavBlob = this.bufferToWave(
+                        renderedBuffer,
+                        totalDuration,
+                    );
+
+                    const url = URL.createObjectURL(wavBlob);
+                    const a = document.createElement("a");
+                    a.style.display = "none";
+                    a.href = url;
+                    a.download = `misic_${state.bpm}bpm.wav`;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                }
+
+                // encodes AudioBuffer into WAV format
+                static bufferToWave(abuffer, len) {
+                    let numOfChan = abuffer.numberOfChannels,
+                        length = len * abuffer.sampleRate * numOfChan * 2 + 44,
+                        buffer = new ArrayBuffer(length),
+                        view = new DataView(buffer),
+                        channels = [],
+                        i,
+                        sample,
+                        offset = 0,
+                        pos = 0;
+
+                    // write WAV header
+                    const setUint16 = (data) => {
+                        view.setUint16(pos, data, true);
+                        pos += 2;
+                    };
+                    const setUint32 = (data) => {
+                        view.setUint32(pos, data, true);
+                        pos += 4;
+                    };
+                    const writeString = (s) => {
+                        for (let i = 0; i < s.length; i++) {
+                            view.setUint8(pos++, s.charCodeAt(i));
+                        }
+                    };
+
+                    writeString("RIFF");
+                    setUint32(length - 8);
+                    writeString("WAVE");
+                    writeString("fmt ");
+                    setUint32(16);
+                    setUint16(1);
+                    setUint16(numOfChan);
+                    setUint32(abuffer.sampleRate);
+                    setUint32(abuffer.sampleRate * 2 * numOfChan);
+                    setUint16(numOfChan * 2);
+                    setUint16(16);
+                    writeString("data");
+                    setUint32(length - pos - 4);
+
+                    // interleave channels
+                    for (i = 0; i < abuffer.numberOfChannels; i++)
+                        channels.push(abuffer.getChannelData(i));
+
+                    while (pos < length) {
+                        for (i = 0; i < numOfChan; i++) {
+                            sample = Math.max(
+                                -1,
+                                Math.min(1, channels[i][offset]),
+                            );
+                            sample =
+                                (0.5 + sample < 0
+                                    ? sample * 32768
+                                    : sample * 32767) | 0;
+                            view.setInt16(pos, sample, true);
+                            pos += 2;
+                        }
+                        offset++;
+                    }
+                    return new Blob([buffer], { type: "audio/wav" });
+                }
+            }
+
+            /**
+             * MODULE: Transport / Scheduler
+             */
+            class Scheduler {
+                constructor(audioEngine, onStepPlay) {
+                    this.audioEngine = audioEngine;
+                    this.onStepPlay = onStepPlay; // callback to sync UI
+                    this.isPlaying = false;
+                    this.currentStep = 0;
+                    this.nextNoteTime = 0.0;
+                    this.lookahead = 25.0; // ms
+                    this.scheduleAheadTime = 0.1; // s
+                    this.timerID = null;
+                }
+
+                nextNote() {
+                    const secondsPerBeat = 60.0 / AppState.bpm;
+                    this.nextNoteTime += 0.25 * secondsPerBeat; // 16th note timing
+                    this.currentStep = (this.currentStep + 1) % AppState.steps;
+                }
+
+                scheduleNote(stepNumber, time) {
+                    const uiDelay =
+                        (time - this.audioEngine.ctx.currentTime) * 1000;
+                    setTimeout(() => this.onStepPlay(stepNumber), uiDelay);
+
+                    // audio scheduling
+                    const stepDuration = (60.0 / AppState.bpm) * 0.25;
+                    AppState.tracks.forEach((track) => {
+                        if (track.sequence[stepNumber]) {
+                            this.audioEngine.playNote(
+                                track,
+                                time,
+                                stepDuration * 0.8,
+                            );
+                        }
+                    });
+                }
+
+                schedulerLogic() {
+                    while (
+                        this.nextNoteTime <
+                        this.audioEngine.ctx.currentTime +
+                            this.scheduleAheadTime
+                    ) {
+                        this.scheduleNote(this.currentStep, this.nextNoteTime);
+                        this.nextNote();
+                    }
+                    this.timerID = window.setTimeout(
+                        this.schedulerLogic.bind(this),
+                        this.lookahead,
+                    );
+                }
+
+                play() {
+                    if (this.isPlaying) return;
+                    this.audioEngine.resume();
+                    this.isPlaying = true;
+                    this.currentStep = 0;
+                    this.nextNoteTime = this.audioEngine.ctx.currentTime + 0.05;
+                    this.schedulerLogic();
+                }
+
+                stop() {
+                    this.isPlaying = false;
+                    window.clearTimeout(this.timerID);
+                    this.onStepPlay(-1); // clear UI
+                }
+            }
+
+            /**
+             * MODULE: UI Controller
+             */
+            class UIController {
+                constructor() {
+                    this.engine = new AudioEngine();
+                    this.scheduler = new Scheduler(
+                        this.engine,
+                        this.highlightStep.bind(this),
+                    );
+
+                    // elements
+                    this.elHeaders = document.getElementById("track-headers");
+                    this.elGrid = document.getElementById("grid-container");
+
+                    this.isPainting = false;
+                    this.paintState = true;
+
+                    this.bindEvents();
+                    AppState.init();
+                    this.syncHeaderUI();
+                    this.render();
+                }
+
+                bindEvents() {
+                    // transport
+                    document.getElementById("btn-play").onclick = () =>
+                        this.scheduler.play();
+                    document.getElementById("btn-stop").onclick = () =>
+                        this.scheduler.stop();
+
+                    // track management
+                    document.getElementById("btn-add-track").onclick = () => {
+                        AppState.addTrack();
+                        this.render();
+                        AppState.saveData();
+                    };
+                    document.getElementById("btn-clear").onclick = () => {
+                        if (confirm("Clear entire sequence?")) {
+                            AppState.tracks.forEach((t) =>
+                                t.sequence.fill(false),
+                            );
+                            this.render();
+                            AppState.saveData();
+                        }
+                    };
+
+                    // settings
+                    const inpBpm = document.getElementById("inp-bpm");
+                    inpBpm.onchange = (e) => {
+                        AppState.bpm = parseInt(e.target.value) || 120;
+                        AppState.saveData();
+                    };
+
+                    const selSteps = document.getElementById("sel-steps");
+                    selSteps.onchange = (e) => {
+                        AppState.steps = parseInt(e.target.value);
+                        this.render();
+                        AppState.saveData();
+                    };
+
+                    // drag painting
+                    document.addEventListener(
+                        "mouseup",
+                        () => (this.isPainting = false),
+                    );
+
+                    // export / import
+                    document.getElementById("btn-export-wav").onclick = async (
+                        e,
+                    ) => {
+                        e.target.innerText = "RENDERING...";
+                        await WAVExporter.export(AppState);
+                        e.target.innerText = "EXP. WAV";
+                    };
+
+                    document.getElementById("btn-export-json").onclick = () => {
+                        const dataStr =
+                            "data:text/json;charset=utf-8," +
+                            encodeURIComponent(
+                                JSON.stringify(AppState.saveData()),
+                            );
+                        const a = document.createElement("a");
+                        a.href = dataStr;
+                        a.download = `misic_project_${Date.now()}.json`;
+                        a.click();
+                    };
+
+                    const impInput = document.getElementById("inp-import-json");
+                    document.getElementById("btn-import-json").onclick = () =>
+                        impInput.click();
+                    impInput.onchange = (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            try {
+                                AppState.loadData(JSON.parse(ev.target.result));
+                                this.syncHeaderUI();
+                                this.render();
+                                AppState.saveData();
+                            } catch (err) {
+                                alert("Invalid JSON file.");
+                            }
+                        };
+                        reader.readAsText(file);
+                        impInput.value = ""; // reset
+                    };
+                }
+
+                syncHeaderUI() {
+                    document.getElementById("inp-bpm").value = AppState.bpm;
+                    document.getElementById("sel-steps").value = AppState.steps;
+                }
+
+                highlightStep(stepIndex) {
+                    // clear old
+                    document
+                        .querySelectorAll(".step.playing")
+                        .forEach((el) => el.classList.remove("playing"));
+                    if (stepIndex === -1) return;
+
+                    // add new
+                    document
+                        .querySelectorAll(`.step[data-col="${stepIndex}"]`)
+                        .forEach((el) => {
+                            el.classList.add("playing");
+                        });
+                }
+
+                toggleStep(r, c, forceState = null) {
+                    const track = AppState.tracks[r];
+                    const newState =
+                        forceState !== null ? forceState : !track.sequence[c];
+                    track.sequence[c] = newState;
+
+                    const el = document.querySelector(
+                        `.step[data-row="${r}"][data-col="${c}"]`,
+                    );
+                    if (newState) el.classList.add("active");
+                    else el.classList.remove("active");
+
+                    AppState.saveData();
+                }
+
+                render() {
+                    this.elHeaders.innerHTML = "";
+                    this.elGrid.innerHTML = "";
+
+                    AppState.tracks.forEach((track, r) => {
+                        // render header
+                        const th = document.createElement("div");
+                        th.className = "track-header";
+
+                        // mute button
+                        const btnMute = document.createElement("button");
+                        btnMute.className =
+                            "track-btn " + (track.mute ? "active" : "");
+                        btnMute.innerText = "M";
+                        btnMute.onclick = () => {
+                            track.mute = !track.mute;
+                            btnMute.classList.toggle("active");
+                            AppState.saveData();
+                        };
+
+                        // name/freq
+                        const inpFreq = document.createElement("input");
+                        inpFreq.type = "text";
+                        inpFreq.value = track.freq;
+                        inpFreq.onchange = (e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val)) track.freq = val;
+                            AppState.saveData();
+                        };
+
+                        // wave type
+                        const selWave = document.createElement("select");
+                        ["sine", "square", "sawtooth", "triangle"].forEach(
+                            (w) => {
+                                const opt = document.createElement("option");
+                                opt.value = w;
+                                opt.innerText = w.substr(0, 3).toUpperCase();
+                                if (track.type === w) opt.selected = true;
+                                selWave.appendChild(opt);
+                            },
+                        );
+                        selWave.onchange = (e) => {
+                            track.type = e.target.value;
+                            AppState.saveData();
+                        };
+
+                        // delete track
+                        const btnDel = document.createElement("button");
+                        btnDel.className = "track-btn";
+                        btnDel.innerText = "X";
+                        btnDel.onclick = () => {
+                            AppState.tracks.splice(r, 1);
+                            this.render();
+                            AppState.saveData();
+                        };
+
+                        th.append(btnMute, inpFreq, selWave, btnDel);
+                        this.elHeaders.appendChild(th);
+
+                        // render grid row
+                        const rowDiv = document.createElement("div");
+                        rowDiv.className = "grid-row";
+
+                        for (let c = 0; c < AppState.steps; c++) {
+                            const stepDiv = document.createElement("div");
+                            stepDiv.className =
+                                "step " + (track.sequence[c] ? "active" : "");
+                            stepDiv.dataset.row = r;
+                            stepDiv.dataset.col = c;
+
+                            // drag painting events
+                            stepDiv.onmousedown = (e) => {
+                                this.isPainting = true;
+                                this.paintState = !track.sequence[c];
+                                this.toggleStep(r, c, this.paintState);
+                            };
+                            stepDiv.onmouseenter = (e) => {
+                                if (this.isPainting) {
+                                    this.toggleStep(r, c, this.paintState);
+                                }
+                            };
+
+                            rowDiv.appendChild(stepDiv);
+                        }
+                        this.elGrid.appendChild(rowDiv);
+                    });
+                }
+            }
+
+            // initialize pls
+            window.onload = () => {
+                const app = new UIController();
+            };
+        </script>
+    </body>
+</html>
